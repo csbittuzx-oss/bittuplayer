@@ -456,6 +456,9 @@ export function AppProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const [activeDownloads, setActiveDownloads] = useState({}); // songId -> progress percentage
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, song: null, playlistId: null });
+  
+  // Single persistent persistent Audio element
+  const audioRef = useRef(new Audio());
 
   const showToast = useCallback((message, type = 'success') => {
     const id = Date.now();
@@ -465,8 +468,30 @@ export function AppProvider({ children }) {
     }, 3000);
   }, []);
 
+  const playTrackGlobally = useCallback((songs, index) => {
+    if (audioRef.current) {
+      // Tiny silent WAV base64 to unlock mobile audio context on click
+      audioRef.current.src = 'data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==';
+      audioRef.current.play().catch(() => {});
+    }
+    dispatch({ type: 'SET_QUEUE', payload: { songs, index } });
+    dispatch({ type: 'SET_CURRENT_SONG', payload: songs[index] });
+    dispatch({ type: 'SET_PLAYING', payload: true });
+  }, []);
+
   return (
-    <AppContext.Provider value={{ state, dispatch, toasts, showToast, activeDownloads, setActiveDownloads, contextMenu, setContextMenu }}>
+    <AppContext.Provider value={{ 
+      state, 
+      dispatch, 
+      toasts, 
+      showToast, 
+      activeDownloads, 
+      setActiveDownloads, 
+      contextMenu, 
+      setContextMenu,
+      audioRef,
+      playTrackGlobally
+    }}>
       {children}
     </AppContext.Provider>
   );
@@ -546,7 +571,7 @@ function getGreeting() {
 
 // --- Home Page ---
 function HomePage() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, playTrackGlobally } = useApp();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState({ charts: [], trending: [], artists: [], newReleases: [] });
 
@@ -604,9 +629,7 @@ function HomePage() {
   };
 
   const handleSongPlay = (song) => {
-    dispatch({ type: 'SET_QUEUE', payload: { songs: [song], index: 0 } });
-    dispatch({ type: 'SET_CURRENT_SONG', payload: song });
-    dispatch({ type: 'SET_PLAYING', payload: true });
+    playTrackGlobally([song], 0);
   };
 
   if (loading) return <HomePageSkeleton />;
@@ -802,7 +825,7 @@ function HomePage() {
 
 // --- Search Screen ---
 function SearchPage() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, playTrackGlobally } = useApp();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('songs'); // 'songs'|'albums'|'artists'|'playlists'
 
@@ -829,9 +852,7 @@ function SearchPage() {
   }, [state.searchQuery]);
 
   const handlePlaySong = (song) => {
-    dispatch({ type: 'SET_QUEUE', payload: { songs: [song], index: 0 } });
-    dispatch({ type: 'SET_CURRENT_SONG', payload: song });
-    dispatch({ type: 'SET_PLAYING', payload: true });
+    playTrackGlobally([song], 0);
   };
 
   const handleCardClick = (item, type) => {
@@ -1151,7 +1172,7 @@ function LibraryPage() {
 
 // --- General Playlist / Album View ---
 function PlaylistPage() {
-  const { state, dispatch, showToast } = useApp();
+  const { state, dispatch, showToast, playTrackGlobally } = useApp();
   const playlist = state.currentViewData;
   const [loading, setLoading] = useState(false);
   const [hydratedPlaylist, setHydratedPlaylist] = useState(null);
@@ -1185,9 +1206,7 @@ function PlaylistPage() {
 
   const handlePlaySong = (index) => {
     if (!hydratedPlaylist || !hydratedPlaylist.songs) return;
-    dispatch({ type: 'SET_QUEUE', payload: { songs: hydratedPlaylist.songs, index } });
-    dispatch({ type: 'SET_CURRENT_SONG', payload: hydratedPlaylist.songs[index] });
-    dispatch({ type: 'SET_PLAYING', payload: true });
+    playTrackGlobally(hydratedPlaylist.songs, index);
   };
 
   const handleDelete = () => {
@@ -1266,7 +1285,7 @@ function PlaylistPage() {
 
 // --- Album View ---
 function AlbumPage() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, playTrackGlobally } = useApp();
   const album = state.currentViewData;
   const [loading, setLoading] = useState(false);
   const [hydratedAlbum, setHydratedAlbum] = useState(null);
@@ -1290,9 +1309,7 @@ function AlbumPage() {
 
   const handlePlaySong = (index) => {
     if (!hydratedAlbum || !hydratedAlbum.songs) return;
-    dispatch({ type: 'SET_QUEUE', payload: { songs: hydratedAlbum.songs, index } });
-    dispatch({ type: 'SET_CURRENT_SONG', payload: hydratedAlbum.songs[index] });
-    dispatch({ type: 'SET_PLAYING', payload: true });
+    playTrackGlobally(hydratedAlbum.songs, index);
   };
 
   if (loading) return <PlaylistSkeleton />;
@@ -1347,7 +1364,7 @@ function AlbumPage() {
 
 // --- Artist View ---
 function ArtistPage() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, playTrackGlobally } = useApp();
   const artist = state.currentViewData;
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState({ artistInfo: null, songs: [], albums: [] });
@@ -1384,9 +1401,7 @@ function ArtistPage() {
 
   const handlePlaySong = (index) => {
     if (data.songs.length === 0) return;
-    dispatch({ type: 'SET_QUEUE', payload: { songs: data.songs, index } });
-    dispatch({ type: 'SET_CURRENT_SONG', payload: data.songs[index] });
-    dispatch({ type: 'SET_PLAYING', payload: true });
+    playTrackGlobally(data.songs, index);
   };
 
   const handleAlbumClick = (albumItem) => {
@@ -2061,7 +2076,7 @@ export default function App() {
 }
 
 function AppContainer() {
-  const { state, dispatch, toasts, showToast, contextMenu, setContextMenu } = useApp();
+  const { state, dispatch, toasts, showToast, contextMenu, setContextMenu, audioRef, playTrackGlobally } = useApp();
   const [queueOpen, setQueueOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -2069,9 +2084,6 @@ function AppContainer() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [bufferedTime, setBufferedTime] = useState(0);
-
-  // Single persistent persistent Audio element
-  const audioRef = useRef(new Audio());
   const activeObjectUrlRef = useRef(null);
 
   // Clean up Object URL to prevent leaks
@@ -2091,10 +2103,13 @@ function AppContainer() {
   useEffect(() => {
     if (state.isPlaying) {
       if (audioRef.current.src && audioRef.current.src !== window.location.href) {
+        const isSilentWav = audioRef.current.src.startsWith('data:');
         audioRef.current.play().catch(err => {
           if (err.name !== 'AbortError') {
             console.warn("Autoplay blocked or stream fail:", err);
-            dispatch({ type: 'SET_PLAYING', payload: false });
+            if (!isSilentWav) {
+              dispatch({ type: 'SET_PLAYING', payload: false });
+            }
           }
         });
       }
@@ -2196,6 +2211,9 @@ function AppContainer() {
     };
 
     const handleEnded = () => {
+      if (audioRef.current.src && audioRef.current.src.startsWith('data:')) {
+        return;
+      }
       nextSong();
     };
 
