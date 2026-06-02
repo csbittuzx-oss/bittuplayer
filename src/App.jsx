@@ -469,15 +469,37 @@ export function AppProvider({ children }) {
   }, []);
 
   const playTrackGlobally = useCallback((songs, index) => {
-    if (audioRef.current) {
-      // Tiny silent WAV base64 to unlock mobile audio context on click
-      audioRef.current.src = 'data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==';
-      audioRef.current.play().catch(() => {});
+    const song = songs[index];
+    if (audioRef.current && song) {
+      audioRef.current.currentSongId = song.id;
+      
+      const dbRecord = state.downloadedSongs?.find(s => s.id === song.id);
+      let sourceUrl;
+      if (dbRecord && dbRecord.audioBlob) {
+        sourceUrl = URL.createObjectURL(dbRecord.audioBlob);
+        if (audioRef.current.activeObjectUrl) {
+          URL.revokeObjectURL(audioRef.current.activeObjectUrl);
+        }
+        audioRef.current.activeObjectUrl = sourceUrl;
+      } else {
+        sourceUrl = getAudioUrlByQuality(song, state.audioQuality || 'high');
+      }
+
+      if (sourceUrl) {
+        audioRef.current.src = sourceUrl;
+        audioRef.current.load();
+        audioRef.current.play().catch(err => {
+          console.warn("Synchronous playback failed:", err);
+        });
+      } else {
+        audioRef.current.src = 'data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==';
+        audioRef.current.play().catch(() => {});
+      }
     }
     dispatch({ type: 'SET_QUEUE', payload: { songs, index } });
-    dispatch({ type: 'SET_CURRENT_SONG', payload: songs[index] });
+    dispatch({ type: 'SET_CURRENT_SONG', payload: song });
     dispatch({ type: 'SET_PLAYING', payload: true });
-  }, []);
+  }, [state.downloadedSongs, state.audioQuality]);
 
   return (
     <AppContext.Provider value={{ 
@@ -838,9 +860,16 @@ function SearchPage() {
     const delay = setTimeout(async () => {
       try {
         setLoading(true);
-        // Call global API search endpoint
-        const res = await apiFetch(`/search/all?query=${encodeURIComponent(state.searchQuery)}`);
-        dispatch({ type: 'SET_SEARCH_RESULTS', payload: res });
+        const [allRes, songsRes] = await Promise.all([
+          apiFetch(`/search/all?query=${encodeURIComponent(state.searchQuery)}`),
+          apiFetch(`/search/songs?query=${encodeURIComponent(state.searchQuery)}&limit=20`).catch(() => null)
+        ]);
+        if (allRes) {
+          if (songsRes) {
+            allRes.songs = songsRes;
+          }
+          dispatch({ type: 'SET_SEARCH_RESULTS', payload: allRes });
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -2088,6 +2117,10 @@ function AppContainer() {
 
   // Clean up Object URL to prevent leaks
   const cleanActiveUrl = () => {
+    if (audioRef.current.activeObjectUrl) {
+      URL.revokeObjectURL(audioRef.current.activeObjectUrl);
+      audioRef.current.activeObjectUrl = null;
+    }
     if (activeObjectUrlRef.current) {
       URL.revokeObjectURL(activeObjectUrlRef.current);
       activeObjectUrlRef.current = null;
@@ -2121,6 +2154,17 @@ function AppContainer() {
   // Load Source URL and play
   const playTrack = async (song) => {
     try {
+      if (audioRef.current.currentSongId === song.id && 
+          audioRef.current.src && 
+          !audioRef.current.src.startsWith('data:') && 
+          audioRef.current.src !== window.location.href) {
+        if (state.isPlaying && audioRef.current.paused) {
+          audioRef.current.play().catch(() => {});
+        }
+        return;
+      }
+
+      audioRef.current.currentSongId = song.id;
       cleanActiveUrl();
       // Check offline IndexedDB blob synchronously from state cache first
       const dbRecord = state.downloadedSongs?.find(s => s.id === song.id);
@@ -2129,17 +2173,17 @@ function AppContainer() {
       if (dbRecord && dbRecord.audioBlob) {
         sourceUrl = URL.createObjectURL(dbRecord.audioBlob);
         activeObjectUrlRef.current = sourceUrl;
+        audioRef.current.activeObjectUrl = sourceUrl;
       } else {
         if (!song.downloadUrl || song.downloadUrl.length === 0) {
           try {
             const detailRes = await apiFetch(`/songs?id=${song.id}`);
             if (detailRes && detailRes.length > 0) {
               fullSong = detailRes[0];
-              // Update state so it has full properties (e.g. downloadUrl, safe artwork)
               dispatch({ type: 'SET_CURRENT_SONG', payload: fullSong });
               const updatedQueue = state.queue.map(s => s.id === song.id ? fullSong : s);
               dispatch({ type: 'SET_QUEUE', payload: { songs: updatedQueue, index: state.queueIndex } });
-              return; // Return early. The state change will naturally trigger playTrack again for fullSong!
+              return;
             }
           } catch (fetchErr) {
             console.error("Failed to fetch full song details:", fetchErr);
