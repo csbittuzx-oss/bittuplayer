@@ -47,7 +47,7 @@ import {
 // ==========================================
 // 1. API Helper & CORS Handling
 // ==========================================
-const API_BASE = 'https://jiosaavn-api-beta.vercel.app';
+const API_BASE = 'https://jiosaavn-api-gilt.vercel.app';
 const CORS_PROXY = 'https://corsproxy.io/?';
 
 // HTML Entity decoder helper
