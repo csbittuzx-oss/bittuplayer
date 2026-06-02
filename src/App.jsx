@@ -2081,14 +2081,18 @@ function AppContainer() {
   // Handle Playback State Transitions
   useEffect(() => {
     if (state.isPlaying) {
-      audioRef.current.play().catch(e => {
-        console.warn("Autoplay blocked or stream fail:", e);
-        dispatch({ type: 'SET_PLAYING', payload: false });
-      });
+      if (audioRef.current.src && audioRef.current.src !== window.location.href) {
+        audioRef.current.play().catch(err => {
+          if (err.name !== 'AbortError') {
+            console.warn("Autoplay blocked or stream fail:", err);
+            dispatch({ type: 'SET_PLAYING', payload: false });
+          }
+        });
+      }
     } else {
       audioRef.current.pause();
     }
-  }, [state.isPlaying, state.currentSong]);
+  }, [state.isPlaying]);
 
   // Load Source URL and play
   const playTrack = async (song) => {
@@ -2111,6 +2115,7 @@ function AppContainer() {
               dispatch({ type: 'SET_CURRENT_SONG', payload: fullSong });
               const updatedQueue = state.queue.map(s => s.id === song.id ? fullSong : s);
               dispatch({ type: 'SET_QUEUE', payload: { songs: updatedQueue, index: state.queueIndex } });
+              return; // Return early. The state change will naturally trigger playTrack again for fullSong!
             }
           } catch (fetchErr) {
             console.error("Failed to fetch full song details:", fetchErr);
@@ -2124,8 +2129,10 @@ function AppContainer() {
       audioRef.current.src = sourceUrl;
       audioRef.current.load();
       if (state.isPlaying) {
-        audioRef.current.play().catch(() => {
-          dispatch({ type: 'SET_PLAYING', payload: false });
+        audioRef.current.play().catch(err => {
+          if (err.name !== 'AbortError') {
+            dispatch({ type: 'SET_PLAYING', payload: false });
+          }
         });
       }
 
