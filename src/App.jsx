@@ -123,6 +123,15 @@ function getImageUrl(item, sizeIndex = 2) {
   return 'https://placehold.co/150';
 }
 
+// Get proper artist name from song metadata
+function getArtistName(song) {
+  if (!song) return 'Unknown Artist';
+  if (song.artists?.primary?.[0]?.name) return song.artists.primary[0].name;
+  if (song.primaryArtists) return song.primaryArtists;
+  if (song.artists) return song.artists;
+  return 'Unknown Artist';
+}
+
 // Download a song offline helper
 async function downloadSong(song, qualitySetting = 'high') {
   try {
@@ -170,7 +179,7 @@ async function downloadSong(song, qualitySetting = 'high') {
     const songData = {
       id: fullSong.id,
       name: fullSong.name || fullSong.title || 'Unknown Song',
-      artists: fullSong.artists?.primary?.map(a => a.name).join(', ') || fullSong.artists || 'Unknown Artist',
+      artists: getArtistName(fullSong),
       album: fullSong.album?.name || fullSong.album || '',
       duration: fullSong.duration,
       audioBlob,
@@ -633,7 +642,7 @@ function HomePage() {
               <div className="pl-4 pr-2 flex-grow overflow-hidden">
                 <p className="font-semibold text-sm truncate text-white">{decodeHtml(song.name || song.title)}</p>
                 <p className="text-xs text-neutral-400 truncate mt-1">
-                  {decodeHtml(song.artists?.primary?.[0]?.name || song.artists || 'Unknown Artist')}
+                  {decodeHtml(getArtistName(song))}
                 </p>
               </div>
               <button
@@ -705,7 +714,7 @@ function HomePage() {
                 </div>
                 <h3 className="font-semibold text-sm truncate text-white">{decodeHtml(song.name || song.title)}</h3>
                 <p className="text-xs text-neutral-400 truncate mt-1">
-                  {decodeHtml(song.artists?.primary?.[0]?.name || song.artists || 'Unknown Artist')}
+                  {decodeHtml(getArtistName(song))}
                 </p>
               </div>
             ))}
@@ -780,7 +789,7 @@ function HomePage() {
                 </div>
                 <h3 className="font-bold text-sm truncate text-white">{decodeHtml(album.name)}</h3>
                 <p className="text-xs text-neutral-400 truncate mt-1">
-                  {decodeHtml(album.artists?.primary?.[0]?.name || album.artists || 'Various Artists')}
+                  {decodeHtml(getArtistName(album))}
                 </p>
               </div>
             ))}
@@ -926,7 +935,7 @@ function SearchPage() {
                   <span className="text-xs text-neutral-400">Song</span>
                   <span className="w-1 h-1 rounded-full bg-neutral-600" />
                   <span className="text-xs font-semibold text-neutral-300 truncate">
-                    {decodeHtml(topResult.artists?.primary?.[0]?.name || topResult.artists || 'Unknown Artist')}
+                    {decodeHtml(getArtistName(topResult))}
                   </span>
                 </div>
                 <button
@@ -958,7 +967,7 @@ function SearchPage() {
                     <div className="overflow-hidden">
                       <p className="font-semibold text-sm text-white truncate">{decodeHtml(song.name || song.title)}</p>
                       <p className="text-xs text-neutral-400 truncate">
-                        {decodeHtml(song.artists?.primary?.[0]?.name || song.artists || 'Unknown Artist')}
+                        {decodeHtml(getArtistName(song))}
                       </p>
                     </div>
                   </div>
@@ -987,7 +996,7 @@ function SearchPage() {
               </div>
               <h3 className="font-bold text-sm truncate text-white">{decodeHtml(album.name)}</h3>
               <p className="text-xs text-neutral-400 truncate mt-1">
-                {decodeHtml(album.artists?.primary?.[0]?.name || album.artists || 'Various Artists')}
+                {decodeHtml(getArtistName(album))}
               </p>
             </div>
           ))}
@@ -1306,7 +1315,7 @@ function AlbumPage() {
           <span className="text-xs uppercase tracking-wider font-bold text-neutral-200">Album</span>
           <h1 className="text-4xl md:text-5xl font-black text-white">{decodeHtml(hydratedAlbum.name)}</h1>
           <div className="text-xs text-neutral-400 flex items-center space-x-2">
-            <span className="text-white font-semibold">{decodeHtml(hydratedAlbum.artists?.primary?.[0]?.name || 'Unknown Artist')}</span>
+            <span className="text-white font-semibold">{decodeHtml(getArtistName(hydratedAlbum))}</span>
             <span className="w-1 h-1 rounded-full bg-neutral-600" />
             <span>{hydratedAlbum.year || ''}</span>
             <span className="w-1 h-1 rounded-full bg-neutral-600" />
@@ -1724,7 +1733,7 @@ function SongsListTable({ songs, onPlaySong, playlistId }) {
                 <div className="overflow-hidden">
                   <p className="font-semibold text-sm text-white truncate">{decodeHtml(song.name || song.title)}</p>
                   <p className="text-xs text-neutral-400 truncate">
-                    {decodeHtml(song.artists?.primary?.[0]?.name || song.artists || 'Unknown Artist')}
+                    {decodeHtml(getArtistName(song))}
                   </p>
                 </div>
               </div>
@@ -1996,7 +2005,7 @@ function QueuePanel({ isOpen, onClose }) {
               <div className="overflow-hidden">
                 <p className="font-semibold text-sm text-[#1db954] truncate">{decodeHtml(nowPlaying.name || nowPlaying.title)}</p>
                 <p className="text-xs text-neutral-400 truncate">
-                  {decodeHtml(nowPlaying.artists?.primary?.[0]?.name || nowPlaying.artists || 'Unknown Artist')}
+                  {decodeHtml(getArtistName(nowPlaying))}
                 </p>
               </div>
             </div>
@@ -2026,7 +2035,7 @@ function QueuePanel({ isOpen, onClose }) {
                     <div className="overflow-hidden flex-grow">
                       <p className="font-semibold text-xs text-white truncate">{decodeHtml(song.name || song.title)}</p>
                       <p className="text-[10px] text-neutral-400 truncate">
-                        {decodeHtml(song.artists?.primary?.[0]?.name || song.artists || 'Unknown Artist')}
+                        {decodeHtml(getArtistName(song))}
                       </p>
                     </div>
                   </div>
@@ -2098,8 +2107,8 @@ function AppContainer() {
   const playTrack = async (song) => {
     try {
       cleanActiveUrl();
-      // Check offline IndexedDB blob first
-      const dbRecord = await getDownload(song.id);
+      // Check offline IndexedDB blob synchronously from state cache first
+      const dbRecord = state.downloadedSongs?.find(s => s.id === song.id);
       let sourceUrl;
       let fullSong = song;
       if (dbRecord && dbRecord.audioBlob) {
@@ -2140,7 +2149,7 @@ function AppContainer() {
       if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: decodeHtml(fullSong.name || fullSong.title),
-          artist: decodeHtml(fullSong.artists?.primary?.[0]?.name || fullSong.artists || 'Unknown Artist'),
+          artist: decodeHtml(getArtistName(fullSong)),
           album: decodeHtml(fullSong.album?.name || fullSong.album || ''),
           artwork: [{ src: getImageUrl(fullSong, 2) }]
         });
@@ -2580,7 +2589,7 @@ function AppContainer() {
             <div className="overflow-hidden">
               <p className="font-semibold text-xs text-white truncate">{decodeHtml(state.currentSong.name || state.currentSong.title)}</p>
               <p className="text-[10px] text-neutral-400 truncate">
-                {decodeHtml(state.currentSong.artists?.primary?.[0]?.name || state.currentSong.artists || 'Unknown Artist')}
+                {decodeHtml(getArtistName(state.currentSong))}
               </p>
             </div>
           </div>
@@ -2657,9 +2666,9 @@ function AppContainer() {
                 </div>
                 <p
                   className="text-xs text-neutral-400 truncate mt-0.5 hover:underline cursor-pointer"
-                  onClick={() => dispatch({ type: 'SET_VIEW', payload: { view: 'artist', data: state.currentSong.artists?.primary?.[0] } })}
+                  onClick={() => dispatch({ type: 'SET_VIEW', payload: { view: 'artist', data: state.currentSong.artists?.primary?.[0] || { name: getArtistName(state.currentSong) } } })}
                 >
-                  {decodeHtml(state.currentSong.artists?.primary?.[0]?.name || state.currentSong.artists || 'Unknown Artist')}
+                  {decodeHtml(getArtistName(state.currentSong))}
                 </p>
               </div>
             </>
@@ -2900,7 +2909,7 @@ function AppContainer() {
             <div className="flex-grow text-center md:text-left space-y-6 max-w-lg w-full">
               <div className="space-y-2">
                 <h1 className="text-3xl md:text-4xl font-black text-white line-clamp-1">{decodeHtml(state.currentSong.name || state.currentSong.title)}</h1>
-                <p className="text-lg text-neutral-300 font-semibold">{decodeHtml(state.currentSong.artists?.primary?.[0]?.name || state.currentSong.artists || 'Unknown Artist')}</p>
+                <p className="text-lg text-neutral-300 font-semibold">{decodeHtml(getArtistName(state.currentSong))}</p>
               </div>
 
               {/* Scrolling lyrics placeholder display */}
