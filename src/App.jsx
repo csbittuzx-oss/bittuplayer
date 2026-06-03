@@ -28,6 +28,7 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  ArrowLeft,
   User,
   Settings as SettingsIcon,
   Trash2,
@@ -1980,7 +1981,21 @@ function ArtistPage() {
 
 // --- Liked Songs Screen ---
 function LikedSongsPage() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, showToast, setContextMenu, playTrackGlobally } = useApp();
+  const [scrollOpacity, setScrollOpacity] = useState(0);
+
+  useEffect(() => {
+    const scrollEl = document.querySelector('.flex-1.overflow-y-auto');
+    if (!scrollEl) return;
+    
+    const onScroll = () => {
+      const opacity = Math.min(1, scrollEl.scrollTop / 100);
+      setScrollOpacity(opacity);
+    };
+    
+    scrollEl.addEventListener('scroll', onScroll);
+    return () => scrollEl.removeEventListener('scroll', onScroll);
+  }, []);
 
   const handlePlaySong = (index) => {
     if (state.likedSongs.length === 0) return;
@@ -1989,47 +2004,140 @@ function LikedSongsPage() {
     dispatch({ type: 'SET_PLAYING', payload: true });
   };
 
+  const handleThreeDotClick = (e, song) => {
+    e.stopPropagation();
+    setContextMenu({
+      visible: true,
+      x: Math.min(window.innerWidth - 240, e.clientX - 180),
+      y: Math.min(window.innerHeight - 360, e.clientY + 10),
+      song,
+      playlistId: null
+    });
+  };
+
   return (
-    <div className="pb-32">
-      <div className="bg-gradient-to-b from-[#4c1d95] to-[#121212] px-6 pt-16 pb-6 flex flex-col md:flex-row items-end space-y-4 md:space-y-0 md:space-x-6">
-        <div className="w-48 h-48 rounded bg-gradient-to-br from-violet-600 to-indigo-900 flex items-center justify-center flex-shrink-0 shadow-2xl relative">
-          <Heart className="w-20 h-20 text-white fill-white" />
+    <div className="min-h-full bg-[#121212] pb-32 relative select-none">
+      {/* 1. TOP HEADER BAR */}
+      <div className="sticky top-0 z-30" style={{ height: '90px' }}>
+        {/* Base Gradient Layer */}
+        <div 
+          className="absolute inset-0 transition-opacity duration-300"
+          style={{
+            background: 'linear-gradient(180deg, #3d4fa0 0%, #2a3580 60%, #121212 100%)',
+            opacity: 1 - scrollOpacity
+          }}
+        />
+        {/* Scroll Overlap Solid Layer */}
+        <div 
+          className="absolute inset-0 bg-[#121212] transition-opacity duration-300"
+          style={{
+            opacity: scrollOpacity
+          }}
+        />
+        
+        {/* Content */}
+        <div className="relative z-10 flex items-center justify-between h-full px-5 py-4">
+          <button 
+            onClick={() => window.history.back()}
+            className="text-white cursor-pointer hover:scale-105 active:scale-95 transition"
+            aria-label="Back"
+          >
+            <ArrowLeft size={26} color="#fff" />
+          </button>
+          
+          <h1 className="text-xl font-bold text-white">Liked Songs</h1>
+          
+          <div className="w-[26px]" />
         </div>
-        <div className="space-y-2">
-          <span className="text-xs uppercase tracking-wider font-bold text-neutral-200">Playlist</span>
-          <h1 className="text-4xl md:text-5xl font-black text-white">Liked Songs</h1>
-          <div className="text-xs text-neutral-400 flex items-center space-x-2">
-            <span className="text-white font-semibold">You</span>
-            <span className="w-1 h-1 rounded-full bg-neutral-600" />
-            <span>{state.likedSongs.length} songs</span>
-          </div>
-        </div>
-      </div>
 
-      <div className="p-6 space-y-6">
+        {/* Floating Play Button */}
         {state.likedSongs.length > 0 && (
-          <div className="flex items-center space-x-6">
-            <button
-              className="w-14 h-14 bg-[#1db954] hover:scale-105 transition rounded-full flex items-center justify-center shadow-md cursor-pointer"
-              onClick={() => handlePlaySong(0)}
-              aria-label="Play liked songs"
-            >
-              <Play className="w-6 h-6 text-black fill-black ml-0.5" />
-            </button>
-          </div>
+          <button
+            onClick={() => handlePlaySong(0)}
+            className="absolute bottom-[-26px] right-5 w-[52px] h-[52px] rounded-full bg-[#1DB954] flex items-center justify-center shadow-[0_4px_16px_rgba(29,185,84,0.3)] hover:scale-105 active:scale-95 transition-all duration-200 z-40 cursor-pointer border-none"
+          >
+            <Play className="w-5 h-5 fill-black text-black translate-x-[1px]" />
+          </button>
         )}
-
-        <div className="space-y-1">
-          {state.likedSongs.length === 0 ? (
-            <div className="text-neutral-500 py-20 text-center flex flex-col items-center justify-center space-y-3">
-              <Heart className="w-12 h-12 text-neutral-700" />
-              <p className="text-sm">Songs you heart will appear here.</p>
-            </div>
-          ) : (
-            <SongsListTable songs={state.likedSongs} onPlaySong={handlePlaySong} />
-          )}
-        </div>
       </div>
+
+      {state.likedSongs.length === 0 ? (
+        /* 4. EMPTY STATE */
+        <div className="flex flex-col items-center justify-center text-center px-6 py-28 text-[#b3b3b3]">
+          <Heart className="w-16 h-16 text-[#b3b3b3] mb-4 opacity-50 fill-none" />
+          <h3 className="text-lg font-bold text-white mb-2">Songs you like will appear here</h3>
+          <button
+            onClick={() => dispatch({ type: 'SET_VIEW', payload: { view: 'search' } })}
+            className="mt-4 px-6 py-3 rounded-full bg-[#FFFFFF] hover:bg-neutral-200 text-black text-sm font-bold transition shadow-md cursor-pointer border-none"
+          >
+            Browse Music
+          </button>
+        </div>
+      ) : (
+        <div className="pt-8">
+          {/* 6. SONG COUNT SUBHEADER */}
+          <div className="text-[13px] text-[#b3b3b3] px-4 pb-2 font-semibold">
+            {state.likedSongs.length} songs
+          </div>
+
+          {/* 2. SONG LIST */}
+          <div className="space-y-0">
+            {state.likedSongs.map((song, index) => {
+              const isCurrent = state.currentSong && state.currentSong.id === song.id;
+              
+              return (
+                <div
+                  key={song.id || index}
+                  onClick={() => handlePlaySong(index)}
+                  className="flex items-center px-4 py-2.5 gap-3 hover:bg-[#1a1a1a] transition cursor-pointer select-none"
+                  style={{ backgroundColor: '#121212' }}
+                >
+                  {/* Album Art */}
+                  <img
+                    src={getImageUrl(song, 1)}
+                    alt=""
+                    className="w-14 h-14 object-cover rounded shadow-md flex-shrink-0"
+                    style={{ borderRadius: '4px' }}
+                  />
+
+                  {/* Song Title and Artist */}
+                  <div className="flex-grow min-w-0 pr-2">
+                    <p 
+                      className="font-semibold text-white truncate"
+                      style={{ 
+                        fontSize: '15px', 
+                        color: isCurrent ? '#1DB954' : '#fff',
+                        maxWidth: 'calc(100vw - 120px)'
+                      }}
+                    >
+                      {isCurrent && <span className="text-[#1DB954]">... </span>}
+                      {decodeHtml(song.name || song.title)}
+                    </p>
+                    <p 
+                      className="text-neutral-400 truncate mt-0.5"
+                      style={{ 
+                        fontSize: '13px', 
+                        color: '#b3b3b3',
+                        fontWeight: '400'
+                      }}
+                    >
+                      {decodeHtml(getArtistName(song))}
+                    </p>
+                  </div>
+
+                  {/* Context menu action */}
+                  <button
+                    onClick={(e) => handleThreeDotClick(e, song)}
+                    className="w-10 h-10 hover:bg-white/5 rounded-full flex items-center justify-center flex-shrink-0 text-[#b3b3b3] hover:text-white transition cursor-pointer border-none bg-transparent"
+                  >
+                    <MoreVertical size={24} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
