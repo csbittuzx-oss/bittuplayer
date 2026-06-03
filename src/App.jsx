@@ -10,6 +10,7 @@ import React, {
 import {
   Home as HomeIcon,
   Search as SearchIcon,
+  Search,
   Library as LibraryIcon,
   Play,
   Pause,
@@ -2121,6 +2122,7 @@ function AppContainer() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [bufferedTime, setBufferedTime] = useState(0);
+  const [homeFilter, setHomeFilter] = useState('all'); // 'all' | 'music' | 'podcasts'
   const activeObjectUrlRef = useRef(null);
 
   // Clean up Object URL to prevent leaks
@@ -2575,64 +2577,161 @@ function AppContainer() {
         {/* Scrollable Main Content Frame */}
         <main className="flex-1 flex flex-col min-w-0 bg-[#121212] overflow-hidden">
           {/* Top Bar Header with profile tools and back navigation */}
-          <header className="h-16 px-6 bg-black/40 backdrop-blur-md flex items-center justify-between z-20 flex-shrink-0">
-            <div className="flex items-center space-x-4 flex-grow max-w-lg">
+          {state.currentView === 'home' ? (
+            <header 
+              className="sticky top-0 z-10 flex-shrink-0 w-full flex items-center space-x-3"
+              style={{
+                backgroundColor: '#121212',
+                padding: '16px',
+              }}
+            >
+              <img
+                src="https://i.ibb.co/qYcQqXrw/Picsart-26-06-03-08-58-56-505.png"
+                alt="Profile"
+                style={{
+                  borderRadius: '50%',
+                  width: '40px',
+                  height: '40px',
+                  objectFit: 'cover'
+                }}
+                className="cursor-pointer hover:opacity-90 transition flex-shrink-0"
+                onClick={() => setSettingsOpen(true)}
+              />
               <div className="flex space-x-2">
                 <button
-                  className="w-8 h-8 rounded-full bg-black/70 flex items-center justify-center hover:bg-neutral-800 transition cursor-pointer text-white disabled:opacity-40"
-                  aria-label="Back"
-                  onClick={() => window.history.back()}
+                  onClick={() => setHomeFilter('all')}
+                  style={{
+                    borderRadius: '999px',
+                    padding: '8px 18px',
+                    fontSize: '14px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    backgroundColor: homeFilter === 'all' ? '#1DB954' : '#2a2a2a',
+                    color: homeFilter === 'all' ? '#000000' : '#ffffff',
+                    fontWeight: homeFilter === 'all' ? 'bold' : '600'
+                  }}
+                  className="transition"
                 >
-                  <ChevronLeft className="w-5 h-5" />
+                  All
                 </button>
                 <button
-                  className="w-8 h-8 rounded-full bg-black/70 flex items-center justify-center hover:bg-neutral-800 transition cursor-pointer text-white"
-                  aria-label="Forward"
-                  onClick={() => window.history.forward()}
+                  onClick={() => setHomeFilter('music')}
+                  style={{
+                    borderRadius: '999px',
+                    padding: '8px 18px',
+                    fontSize: '14px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    backgroundColor: homeFilter === 'music' ? '#1DB954' : '#2a2a2a',
+                    color: homeFilter === 'music' ? '#000000' : '#ffffff',
+                    fontWeight: homeFilter === 'music' ? 'bold' : '600'
+                  }}
+                  className="transition"
                 >
-                  <ChevronRight className="w-5 h-5" />
+                  Music
+                </button>
+                <button
+                  onClick={() => setHomeFilter('podcasts')}
+                  style={{
+                    borderRadius: '999px',
+                    padding: '8px 18px',
+                    fontSize: '14px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    backgroundColor: homeFilter === 'podcasts' ? '#1DB954' : '#2a2a2a',
+                    color: homeFilter === 'podcasts' ? '#000000' : '#ffffff',
+                    fontWeight: homeFilter === 'podcasts' ? 'bold' : '600'
+                  }}
+                  className="transition"
+                >
+                  Podcasts
                 </button>
               </div>
-
-              {/* Dynamic Search Bar (Visible only when in Search View) */}
-              {state.currentView === 'search' && (
-                <div className="relative flex-grow max-w-sm ml-4">
-                  <SearchIcon className="absolute left-3 top-2.5 w-4.5 h-4.5 text-neutral-400" />
+            </header>
+          ) : state.currentView === 'search' ? (
+            <header 
+              className="sticky top-0 flex items-center z-10 flex-shrink-0 w-full"
+              style={{
+                backgroundColor: '#121212',
+                padding: '16px'
+              }}
+            >
+              <div className="relative w-full transition-transform duration-200 focus-within:scale-[1.01]">
+                <div 
+                  className="flex items-center w-full"
+                  style={{ 
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '8px',
+                    padding: '14px 16px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                    border: 'none'
+                  }}
+                >
+                  <Search size={20} color="#000" className="flex-shrink-0 mr-3" />
                   <input
                     type="text"
-                    placeholder="What do you want to play?"
+                    placeholder="What do you want to listen to?"
                     value={state.searchQuery}
                     onChange={(e) => dispatch({ type: 'SET_SEARCH_QUERY', payload: e.target.value })}
-                    className="w-full bg-[#242424] hover:bg-[#2a2a2a] focus:bg-[#2a2a2a] text-white text-sm pl-10 pr-8 py-2 rounded-full border-none focus:outline-none focus:ring-2 focus:ring-white transition"
+                    className="w-full bg-transparent text-black border-none focus:outline-none focus:ring-0 p-0 placeholder-[#9a9a9a] placeholder:font-semibold placeholder:text-[16px]"
+                    style={{
+                      fontWeight: '600',
+                      fontSize: '16px',
+                      border: 'none',
+                      outline: 'none',
+                      boxShadow: 'none'
+                    }}
                   />
                   {state.searchQuery && (
                     <button
                       onClick={() => dispatch({ type: 'SET_SEARCH_QUERY', payload: '' })}
-                      className="absolute right-3 top-2.5 text-neutral-400 hover:text-white cursor-pointer"
+                      className="text-neutral-500 hover:text-black cursor-pointer ml-2 flex-shrink-0"
                       aria-label="Clear Search"
                     >
-                      <X className="w-4.5 h-4.5" />
+                      <X className="w-5 h-5" />
                     </button>
                   )}
                 </div>
-              )}
-            </div>
-
-            {/* Profile Dropdown avatar */}
-            <div className="flex items-center space-x-3 flex-shrink-0">
-              {sleepTimerActive && (
-                <span className="text-[10px] uppercase font-bold text-amber-500 flex items-center space-x-1 border border-amber-500/40 rounded px-2 py-0.5 animate-pulse">
-                  <span>Sleep: {sleepTimerActive}m</span>
-                </span>
-              )}
-              <div
-                className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center cursor-pointer border border-neutral-700 hover:border-white transition"
-                onClick={() => setSettingsOpen(true)}
-              >
-                <User className="w-4 h-4 text-white" />
               </div>
-            </div>
-          </header>
+            </header>
+          ) : (
+            <header className="sticky top-0 bg-[#121212]/95 backdrop-blur-md px-6 py-4 flex items-center justify-between z-10 border-b border-neutral-900 flex-shrink-0">
+              <div className="flex items-center flex-grow">
+                <div className="flex space-x-2">
+                  <button
+                    className="w-8 h-8 rounded-full bg-black/70 flex items-center justify-center hover:bg-neutral-800 transition cursor-pointer text-white disabled:opacity-40"
+                    aria-label="Back"
+                    onClick={() => window.history.back()}
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    className="w-8 h-8 rounded-full bg-black/70 flex items-center justify-center hover:bg-neutral-800 transition cursor-pointer text-white"
+                    aria-label="Forward"
+                    onClick={() => window.history.forward()}
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3 flex-shrink-0">
+                {sleepTimerActive && (
+                  <span className="text-[10px] uppercase font-bold text-amber-500 flex items-center space-x-1 border border-amber-500/40 rounded px-2 py-0.5 animate-pulse">
+                    <span>Sleep: {sleepTimerActive}m</span>
+                  </span>
+                )}
+                <div
+                  className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center cursor-pointer border border-neutral-700 hover:border-white transition"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <User className="w-4 h-4 text-white" />
+                </div>
+              </div>
+            </header>
+          )}
 
           {/* Router content holder */}
           <div className="flex-1 overflow-y-auto">
