@@ -42,7 +42,9 @@ import {
   Moon,
   LogOut,
   CloudLightning,
-  AlertCircle
+  AlertCircle,
+  Sliders,
+  Filter
 } from 'lucide-react';
 
 // ==========================================
@@ -1105,12 +1107,22 @@ function SearchPage() {
 
 // --- Library Screen ---
 function LibraryPage() {
-  const { state, dispatch } = useApp();
-  const [activeTab, setActiveTab] = useState('playlists'); // 'playlists'|'albums'
+  const { state, dispatch, showToast, playTrackGlobally } = useApp();
   const [searchFilter, setSearchFilter] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All'); // 'All' | 'Playlists' | 'Downloads' | 'Favorites' | 'Recently Played'
 
   const handleSelectPlaylist = (pl) => {
-    dispatch({ type: 'SET_VIEW', payload: { view: 'playlist', data: pl } });
+    if (pl.isExample) {
+      // Hydrate with some popular song IDs or tracks so they can actually listen to songs!
+      const mockSongs = [
+        { id: 'mock-1', name: 'Midnight City', title: 'Midnight City', artists: { primary: [{ name: 'M83' }] }, duration: 243, image: 'https://i.ibb.co/qYcQqXrw/Picsart-26-06-03-08-58-56-505.png' },
+        { id: 'mock-2', name: 'Starboy', title: 'Starboy', artists: { primary: [{ name: 'The Weeknd' }] }, duration: 230, image: 'https://i.ibb.co/qYcQqXrw/Picsart-26-06-03-08-58-56-505.png' },
+        { id: 'mock-3', name: 'Sweater Weather', title: 'Sweater Weather', artists: { primary: [{ name: 'The Neighbourhood' }] }, duration: 240, image: 'https://i.ibb.co/qYcQqXrw/Picsart-26-06-03-08-58-56-505.png' }
+      ];
+      dispatch({ type: 'SET_VIEW', payload: { view: 'playlist', data: { ...pl, songs: mockSongs } } });
+    } else {
+      dispatch({ type: 'SET_VIEW', payload: { view: 'playlist', data: pl } });
+    }
   };
 
   const handleSelectLiked = () => {
@@ -1121,83 +1133,530 @@ function LibraryPage() {
     dispatch({ type: 'SET_VIEW', payload: { view: 'downloaded', data: null } });
   };
 
-  const filteredPlaylists = state.playlists.filter(pl =>
+  const handleCreatePlaylist = () => {
+    const name = prompt("Enter playlist name:");
+    if (name) {
+      dispatch({ type: 'CREATE_PLAYLIST', payload: { name } });
+      showToast(`Created playlist "${name}"`);
+    }
+  };
+
+  const handlePlaylistMenu = (e, pl) => {
+    e.stopPropagation();
+    if (pl.isExample) {
+      showToast("Example playlists cannot be modified.");
+      return;
+    }
+    if (confirm(`Delete playlist "${pl.name}"?`)) {
+      dispatch({ type: 'DELETE_PLAYLIST', payload: pl.id });
+      showToast(`Deleted playlist "${pl.name}"`);
+    }
+  };
+
+  // Calculations for subtitle counts
+  const totalPlaylists = state.playlists.length;
+  const totalLiked = state.likedSongs.length;
+  const totalDownloaded = state.downloadedSongs.length;
+  const totalPlaylistSongs = state.playlists.reduce((acc, curr) => acc + (curr.songs?.length || 0), 0);
+  const totalSongs = totalPlaylistSongs + totalLiked + totalDownloaded;
+
+  // Default Example Playlists
+  const defaultExamplePlaylists = [
+    { id: 'ex-1', name: 'Workout Mix', songs: [{}, {}, {}, {}, {}], isExample: true, color: 'from-[#FF512F] to-[#DD2476]' },
+    { id: 'ex-2', name: 'Sad Songs', songs: [{}, {}, {}, {}], isExample: true, color: 'from-[#1A2980] to-[#26D0CE]' },
+    { id: 'ex-3', name: 'Lo-Fi Night', songs: [{}, {}, {}, {}, {}, {}, {}], isExample: true, color: 'from-[#0F2027] to-[#2C5364]' },
+    { id: 'ex-4', name: 'Road Trip', songs: [{}, {}, {}, {}, {}, {}], isExample: true, color: 'from-[#F7971E] to-[#FF007F]' },
+    { id: 'ex-5', name: 'Party Hits', songs: [{}, {}, {}, {}, {}, {}, {}, {}], isExample: true, color: 'from-[#11998e] to-[#38ef7d]' },
+    { id: 'ex-6', name: 'Chill Vibes', songs: [{}, {}, {}], isExample: true, color: 'from-[#8E2DE2] to-[#4A00E0]' }
+  ];
+
+  // Combine user playlists and examples
+  const playlistsToShow = [
+    ...state.playlists.map(pl => ({
+      ...pl,
+      isExample: false,
+      color: 'from-neutral-800 to-neutral-900'
+    })),
+    ...defaultExamplePlaylists.filter(ex => !state.playlists.some(pl => pl.name.toLowerCase() === ex.name.toLowerCase()))
+  ];
+
+  const filteredPlaylists = playlistsToShow.filter(pl =>
     pl.name.toLowerCase().includes(searchFilter.toLowerCase())
   );
 
-  return (
-    <div className="p-6 space-y-6 pb-32">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Your Library</h1>
-        <div className="flex items-center space-x-3">
-          <input
-            type="text"
-            placeholder="Search in Library"
-            value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value)}
-            className="bg-neutral-800 text-xs px-3 py-1.5 rounded-full border-none focus:outline-none focus:ring-1 focus:ring-neutral-700 w-44"
-          />
-          <button
-            className="px-3 py-1.5 rounded-full bg-[#1db954] hover:bg-[#1ed760] text-black text-xs font-bold flex items-center space-x-1"
-            onClick={() => {
-              const name = prompt("Enter playlist name:");
-              if (name) dispatch({ type: 'CREATE_PLAYLIST', payload: { name } });
-            }}
+  // Collage logic
+  const renderPlaylistCollage = (playlist) => {
+    const songs = playlist.songs || [];
+    const images = songs.map(s => getImageUrl(s, 0)).filter(Boolean);
+
+    if (images.length >= 4) {
+      return (
+        <div className="grid grid-cols-2 grid-rows-2 w-full h-full rounded-[18px] overflow-hidden">
+          <img src={images[0]} className="w-full h-full object-cover" alt="" />
+          <img src={images[1]} className="w-full h-full object-cover" alt="" />
+          <img src={images[2]} className="w-full h-full object-cover" alt="" />
+          <img src={images[3]} className="w-full h-full object-cover" alt="" />
+        </div>
+      );
+    } else if (images.length > 0) {
+      return (
+        <img src={images[0]} className="w-full h-full object-cover rounded-[18px]" alt="" />
+      );
+    }
+
+    const gradient = playlist.color || 'from-[#2a2a2a] to-[#121212]';
+    return (
+      <div className={`w-full h-full rounded-[18px] bg-gradient-to-br ${gradient} flex items-center justify-center relative overflow-hidden`}>
+        <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
+        <Music className="w-8 h-8 text-white/60 relative z-10" />
+        <div className="absolute -bottom-4 -right-4 w-12 h-12 rounded-full bg-white/10 blur-md" />
+        <div className="absolute -top-4 -left-4 w-16 h-16 rounded-full bg-white/5 blur-lg" />
+      </div>
+    );
+  };
+
+  const renderPlaylistCard = (playlist) => {
+    return (
+      <div 
+        key={playlist.id}
+        onClick={() => handleSelectPlaylist(playlist)}
+        className="group bg-white/5 border border-white/10 hover:bg-white/10 p-4 rounded-[24px] cursor-pointer transition-all duration-300 relative flex flex-col justify-between"
+      >
+        <div className="w-full aspect-square rounded-[18px] overflow-hidden shadow-lg relative mb-3 group-hover:scale-[1.02] transition-transform duration-300">
+          {renderPlaylistCollage(playlist)}
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-[18px]">
+            <div className="w-12 h-12 rounded-full bg-[#1DB954] flex items-center justify-center shadow-lg hover:scale-105 transition-transform duration-100">
+              <Play className="w-5 h-5 fill-current text-black translate-x-[1px]" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-start justify-between px-1">
+          <div className="overflow-hidden pr-2 flex-grow">
+            <h3 className="font-bold text-sm text-white truncate tracking-tight">{playlist.name}</h3>
+            <span className="text-xs text-neutral-400 mt-1 block">
+              {playlist.isExample ? "Example" : "Playlist"} • {playlist.songs?.length || 0} songs
+            </span>
+          </div>
+          <button 
+            onClick={(e) => handlePlaylistMenu(e, playlist)}
+            className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center flex-shrink-0 transition"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Create Playlist</span>
+            <MoreHorizontal className="w-5 h-5 text-neutral-400 hover:text-white" />
           </button>
         </div>
       </div>
+    );
+  };
 
-      <div className="flex space-x-4 border-b border-neutral-800 pb-2">
-        <button
-          className={`pb-1 text-sm font-semibold ${activeTab === 'playlists' ? 'text-[#1db954] border-b-2 border-[#1db954]' : 'text-neutral-400 hover:text-white'}`}
-          onClick={() => setActiveTab('playlists')}
-        >
-          Playlists
-        </button>
-      </div>
+  // Song list view helper
+  const renderSongList = (songsList, emptyMessage) => {
+    const filteredSongs = songsList.filter(s => 
+      (s.name || s.title || '').toLowerCase().includes(searchFilter.toLowerCase()) || 
+      getArtistName(s).toLowerCase().includes(searchFilter.toLowerCase())
+    );
 
-      {activeTab === 'playlists' && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {/* Special Liked Songs playlist card */}
+    if (filteredSongs.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 text-neutral-500 bg-white/5 border border-white/10 rounded-[24px]">
+          <Music className="w-12 h-12 mb-4 opacity-40" />
+          <p className="text-sm font-medium">{emptyMessage}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {filteredSongs.map((song, i) => (
           <div
-            className="p-6 rounded-lg bg-gradient-to-br from-indigo-700 to-indigo-950 flex flex-col justify-end text-white cursor-pointer relative group shadow-lg min-h-[180px]"
-            onClick={handleSelectLiked}
+            key={song.id || i}
+            onClick={() => playTrackGlobally(song)}
+            className="flex items-center justify-between p-3.5 rounded-[20px] bg-white/5 border border-white/5 hover:bg-white/10 transition cursor-pointer group"
           >
-            <span className="text-xs text-neutral-200 font-semibold mb-1 uppercase tracking-wider">Playlist</span>
-            <h3 className="text-2xl font-black">Liked Songs</h3>
-            <p className="text-xs text-neutral-300 mt-2">{state.likedSongs.length} songs</p>
-          </div>
-
-          {/* Special Offline Downloads card */}
-          <div
-            className="p-6 rounded-lg bg-gradient-to-br from-emerald-800 to-teal-950 flex flex-col justify-end text-white cursor-pointer relative group shadow-lg min-h-[180px]"
-            onClick={handleSelectDownloaded}
-          >
-            <span className="text-xs text-neutral-200 font-semibold mb-1 uppercase tracking-wider">Playlist</span>
-            <h3 className="text-2xl font-black">Downloaded</h3>
-            <p className="text-xs text-neutral-300 mt-2">{state.downloadedSongs.length} offline tracks</p>
-          </div>
-
-          {filteredPlaylists.map((pl) => (
-            <div
-              key={pl.id}
-              className="bg-[#1a1a1a] hover:bg-[#282828] p-4 rounded-lg cursor-pointer transition group flex flex-col justify-between"
-              onClick={() => handleSelectPlaylist(pl)}
-            >
-              <div className="w-full pb-[100%] rounded bg-neutral-800 relative mb-3 flex items-center justify-center">
-                <Music className="w-10 h-10 text-neutral-600 absolute" />
-              </div>
-              <div>
-                <h3 className="font-bold text-sm truncate text-white">{pl.name}</h3>
-                <span className="text-xs text-neutral-400 mt-1 block">Playlist • {pl.songs?.length || 0} songs</span>
+            <div className="flex items-center space-x-4 overflow-hidden flex-grow pr-4">
+              <span className="text-sm font-bold text-neutral-500 w-5 text-center group-hover:text-[#1DB954] transition">
+                {i + 1}
+              </span>
+              <img
+                src={getImageUrl(song, 0)}
+                alt=""
+                className="w-12 h-12 object-cover rounded-xl shadow-md flex-shrink-0"
+              />
+              <div className="overflow-hidden">
+                <p className="font-bold text-white text-sm truncate group-hover:text-[#1DB954] transition">
+                  {decodeHtml(song.name || song.title)}
+                </p>
+                <p className="text-xs text-neutral-400 truncate mt-0.5">
+                  {decodeHtml(getArtistName(song))}
+                </p>
               </div>
             </div>
-          ))}
+            <div className="flex items-center space-x-4 flex-shrink-0">
+              <span className="text-xs text-neutral-400 font-semibold">
+                {formatTime(song.duration)}
+              </span>
+              <div className="w-8 h-8 rounded-full bg-[#1DB954] text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-md">
+                <Play className="w-3.5 h-3.5 fill-current text-black translate-x-[0.5px]" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Quick cards configuration
+  const quickCards = [
+    {
+      title: "Liked Songs",
+      subtitle: `${state.likedSongs.length} Songs`,
+      icon: <Heart className="w-6 h-6 text-white fill-white" />,
+      gradient: "from-[#FF3366] to-[#BA2649]",
+      shadow: "shadow-[#FF3366]/20",
+      action: handleSelectLiked
+    },
+    {
+      title: "Downloads",
+      subtitle: `${state.downloadedSongs.length} Songs`,
+      icon: <Download className="w-6 h-6 text-white" />,
+      gradient: "from-[#00E5FF] to-[#007799]",
+      shadow: "shadow-[#00E5FF]/20",
+      action: handleSelectDownloaded
+    },
+    {
+      title: "Recently Played",
+      subtitle: `${state.recentlyPlayed.length} Tracks`,
+      icon: <Clock className="w-6 h-6 text-white" />,
+      gradient: "from-[#7B2CBF] to-[#3C096C]",
+      shadow: "shadow-[#7B2CBF]/20",
+      action: () => setSelectedCategory('Recently Played')
+    },
+    {
+      title: "Most Played",
+      subtitle: `${Math.max(12, state.likedSongs.length + 5)} Tracks`,
+      icon: <ListMusic className="w-6 h-6 text-white" />,
+      gradient: "from-[#F15BB5] to-[#9B5DE5]",
+      shadow: "shadow-[#F15BB5]/20",
+      action: () => {
+        showToast("Playing your most played songs...");
+        if (state.likedSongs.length > 0) {
+          playTrackGlobally(state.likedSongs[0]);
+        }
+      }
+    }
+  ];
+
+  // Featured continue listening song
+  const featuredSong = state.currentSong || (state.recentlyPlayed.length > 0 ? state.recentlyPlayed[0] : null) || null;
+  const displaySong = featuredSong || {
+    id: 'mock-featured',
+    name: 'Lo-Fi Chill Beats',
+    title: 'Lo-Fi Chill Beats',
+    artists: { primary: [{ name: 'Lofi Records' }] },
+    image: 'https://i.ibb.co/qYcQqXrw/Picsart-26-06-03-08-58-56-505.png',
+    duration: 180
+  };
+
+  const isCurrentlyPlaying = state.currentSong && state.isPlaying && state.currentSong.id === displaySong.id;
+  const progressPercent = isCurrentlyPlaying ? 45 : 68; 
+  const remainingTimeStr = isCurrentlyPlaying ? "1:42 remaining" : "0:56 remaining";
+
+  const handleFeaturedPlay = (e) => {
+    e.stopPropagation();
+    if (state.currentSong?.id === displaySong.id) {
+      dispatch({ type: 'SET_PLAYING', payload: !state.isPlaying });
+    } else {
+      playTrackGlobally(displaySong);
+    }
+  };
+
+  // Recent activity setup
+  const lastLiked = state.likedSongs.length > 0 ? state.likedSongs[state.likedSongs.length - 1] : null;
+  const lastDownloaded = state.downloadedSongs.length > 0 ? state.downloadedSongs[state.downloadedSongs.length - 1] : null;
+  const lastPlayed = state.recentlyPlayed.length > 0 ? state.recentlyPlayed[0] : null;
+
+  const renderActivityCard = (label, song, defaultSong) => {
+    const activeSong = song || defaultSong;
+    return (
+      <div 
+        onClick={() => playTrackGlobally(activeSong)}
+        className="flex items-center space-x-4 p-4 rounded-[24px] bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group"
+      >
+        <img
+          src={getImageUrl(activeSong, 1)}
+          alt=""
+          className="w-14 h-14 object-cover rounded-2xl shadow-md flex-shrink-0 group-hover:scale-105 transition-transform duration-300"
+        />
+        <div className="overflow-hidden flex-grow">
+          <span className="text-[9px] uppercase font-bold tracking-widest text-[#1DB954] block mb-0.5">
+            {label}
+          </span>
+          <h4 className="font-bold text-sm text-white truncate">{decodeHtml(activeSong.name || activeSong.title)}</h4>
+          <p className="text-xs text-neutral-400 truncate mt-0.5">{decodeHtml(getArtistName(activeSong))}</p>
         </div>
-      )}
+        <div className="w-8 h-8 rounded-full bg-white/5 group-hover:bg-[#1DB954] group-hover:text-black flex items-center justify-center flex-shrink-0 transition-all duration-300 shadow-sm">
+          <Play className="w-3.5 h-3.5 fill-current text-white group-hover:text-black translate-x-[0.5px] transition-colors duration-300" />
+        </div>
+      </div>
+    );
+  };
+
+  const renderCategoryContent = () => {
+    switch (selectedCategory) {
+      case 'Playlists':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white tracking-tight">Playlists</h2>
+              <span className="text-xs text-neutral-400 font-semibold">{filteredPlaylists.length} Playlists</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+              {filteredPlaylists.map(pl => renderPlaylistCard(pl))}
+            </div>
+          </div>
+        );
+      case 'Downloads':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white tracking-tight">Downloaded Songs</h2>
+              <span className="text-xs text-neutral-400 font-semibold">{state.downloadedSongs.length} Songs</span>
+            </div>
+            {renderSongList(state.downloadedSongs, "No downloaded songs found. Start downloading tracks for offline playback!")}
+          </div>
+        );
+      case 'Favorites':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white tracking-tight">Favorites & Liked Songs</h2>
+              <span className="text-xs text-neutral-400 font-semibold">{state.likedSongs.length} Songs</span>
+            </div>
+            {renderSongList(state.likedSongs, "No liked songs yet. Tap the heart icon on any song to add it here!")}
+          </div>
+        );
+      case 'Recently Played':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white tracking-tight">Recently Played</h2>
+              <span className="text-xs text-neutral-400 font-semibold">{state.recentlyPlayed.length} Tracks</span>
+            </div>
+            {renderSongList(state.recentlyPlayed, "No recently played tracks yet. Choose a song and start listening!")}
+          </div>
+        );
+      case 'All':
+      default:
+        return (
+          <div className="space-y-10">
+            {/* Quick Access */}
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold text-white tracking-tight">Quick Access</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                {quickCards.map((card) => (
+                  <div
+                    key={card.title}
+                    onClick={card.action}
+                    className={`relative overflow-hidden rounded-[24px] p-6 bg-gradient-to-br ${card.gradient} cursor-pointer transform hover:scale-[1.03] active:scale-95 transition-all duration-300 shadow-xl group border border-white/10`}
+                  >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-4 shadow-sm">
+                      {card.icon}
+                    </div>
+                    <span className="text-xs text-white/70 font-semibold uppercase tracking-wider">{card.subtitle}</span>
+                    <h3 className="text-lg font-black text-white mt-1 tracking-tight">{card.title}</h3>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Continue Listening */}
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold text-white tracking-tight">Continue Listening</h2>
+              <div 
+                onClick={() => playTrackGlobally(displaySong)}
+                className="relative overflow-hidden rounded-[24px] bg-white/5 border border-white/10 p-6 flex flex-col md:flex-row md:items-center justify-between shadow-2xl cursor-pointer group hover:bg-white/10 transition-all duration-300"
+              >
+                <div className="absolute top-0 right-0 w-44 h-44 bg-[#1DB954]/10 rounded-full blur-[60px] pointer-events-none -z-10" />
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[50px] pointer-events-none -z-10" />
+                
+                <div className="flex items-center space-x-5 flex-grow overflow-hidden mr-4">
+                  <img
+                    src={getImageUrl(displaySong, 1)}
+                    alt=""
+                    className="w-20 h-20 md:w-24 md:h-24 rounded-[20px] object-cover shadow-2xl flex-shrink-0 group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="overflow-hidden flex-grow space-y-1">
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-[#1DB954]">
+                      {isCurrentlyPlaying ? "Now Playing" : "Continue Listening"}
+                    </span>
+                    <h3 className="text-xl font-extrabold text-white tracking-tight truncate">
+                      {decodeHtml(displaySong.name || displaySong.title)}
+                    </h3>
+                    <p className="text-xs font-semibold text-neutral-400 truncate">
+                      {decodeHtml(getArtistName(displaySong))}
+                    </p>
+                    
+                    <div className="pt-3 max-w-md hidden sm:block">
+                      <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden relative">
+                        <div 
+                          className="h-full bg-gradient-to-r from-[#1DB954] to-[#1ed760] rounded-full transition-all duration-500"
+                          style={{ width: `${progressPercent}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-neutral-500 font-semibold mt-1.5">
+                        <span>{formatTime(Math.floor((displaySong.duration || 180) * (progressPercent / 100)))}</span>
+                        <span>{remainingTimeStr}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between md:justify-end mt-4 md:mt-0 flex-shrink-0">
+                  <div className="sm:hidden flex-grow pr-4">
+                    <div className="w-28 h-1 bg-white/10 rounded-full overflow-hidden relative">
+                      <div 
+                        className="h-full bg-[#1DB954] rounded-full"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                    <span className="text-[9px] text-neutral-500 mt-1 block">{remainingTimeStr}</span>
+                  </div>
+                  
+                  <button
+                    onClick={handleFeaturedPlay}
+                    className="w-14 h-14 rounded-full bg-[#1DB954] text-black shadow-[0_6px_20px_rgba(29,185,84,0.4)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer"
+                  >
+                    {isCurrentlyPlaying ? (
+                      <Pause className="w-6 h-6 fill-current text-black" />
+                    ) : (
+                      <Play className="w-6 h-6 fill-current text-black translate-x-[1px]" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* My Playlists */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-white tracking-tight">My Playlists</h2>
+                <button
+                  onClick={() => setSelectedCategory('Playlists')}
+                  className="text-xs text-[#1DB954] hover:underline font-bold"
+                >
+                  See All
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+                {filteredPlaylists.map(pl => renderPlaylistCard(pl))}
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold text-white tracking-tight">Recent Activity</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {renderActivityCard("Recently Added", lastLiked, {
+                  id: 'mock-added',
+                  name: 'Midnight City',
+                  artists: { primary: [{ name: 'M83' }] },
+                  image: 'https://i.ibb.co/qYcQqXrw/Picsart-26-06-03-08-58-56-505.png',
+                  duration: 243
+                })}
+                {renderActivityCard("Recently Downloaded", lastDownloaded, {
+                  id: 'mock-down',
+                  name: 'Sweater Weather',
+                  artists: { primary: [{ name: 'The Neighbourhood' }] },
+                  image: 'https://i.ibb.co/qYcQqXrw/Picsart-26-06-03-08-58-56-505.png',
+                  duration: 240
+                })}
+                {renderActivityCard("Recently Played", lastPlayed, {
+                  id: 'mock-played',
+                  name: 'Starboy',
+                  artists: { primary: [{ name: 'The Weeknd' }] },
+                  image: 'https://i.ibb.co/qYcQqXrw/Picsart-26-06-03-08-58-56-505.png',
+                  duration: 230
+                })}
+              </div>
+            </div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-full bg-[#121212] px-6 pt-8 pb-32 space-y-6 relative overflow-hidden select-none">
+      {/* Visual background ambient blobs */}
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-purple-600/10 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-1/3 -right-32 w-80 h-80 bg-emerald-600/5 rounded-full blur-[100px] pointer-events-none" />
+
+      {/* Title section */}
+      <div className="space-y-1">
+        <h1 className="text-4xl font-extrabold text-white tracking-tight">Your Library</h1>
+        <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+          {totalPlaylists} Playlists • {totalSongs} Songs
+        </p>
+      </div>
+
+      {/* Modern glassmorphism search bar */}
+      <div className="relative w-full">
+        <div 
+          className="flex items-center w-full bg-white/5 backdrop-blur-lg border border-white/10 rounded-[18px] transition-all duration-300 focus-within:bg-white/10 focus-within:border-white/20"
+          style={{ padding: '14px 16px' }}
+        >
+          <Search className="w-5 h-5 text-neutral-400 mr-3 flex-shrink-0" />
+          <input
+            type="text"
+            placeholder="Search in Library..."
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            className="w-full bg-transparent text-white border-none focus:outline-none focus:ring-0 p-0 text-sm placeholder-neutral-400 font-semibold"
+            style={{ border: 'none', outline: 'none', boxShadow: 'none' }}
+          />
+          <Sliders className="w-5 h-5 text-neutral-400 ml-3 flex-shrink-0 cursor-pointer hover:text-white transition" />
+        </div>
+      </div>
+
+      {/* Category filters */}
+      <div className="flex space-x-3 overflow-x-auto pb-2 scrollbar-none">
+        {['All', 'Playlists', 'Downloads', 'Favorites', 'Recently Played'].map((cat) => {
+          const isActive = selectedCategory === cat;
+          return (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              style={{
+                borderRadius: '999px',
+                padding: '8px 18px',
+                fontSize: '14px',
+                border: 'none',
+                cursor: 'pointer',
+                flexShrink: 0,
+                backgroundColor: isActive ? '#1DB954' : 'rgba(255, 255, 255, 0.05)',
+                color: isActive ? '#000000' : '#ffffff',
+                fontWeight: isActive ? '700' : '600',
+                transition: 'all 0.2s ease',
+              }}
+              className={`${isActive ? 'shadow-[0_4px_14px_rgba(29,185,84,0.3)]' : 'hover:bg-white/10'}`}
+            >
+              {cat}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Content Rendering switcher */}
+      {renderCategoryContent()}
+
+      {/* Floating Action Button */}
+      <button
+        onClick={handleCreatePlaylist}
+        className="fixed bottom-[110px] right-[24px] w-14 h-14 rounded-full bg-[#1DB954] text-black shadow-[0_8px_24px_rgba(29,185,84,0.4)] hover:shadow-[0_12px_30px_rgba(29,185,84,0.6)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300 z-40 cursor-pointer border-none"
+        aria-label="Create New Playlist"
+      >
+        <Plus className="w-8 h-8 text-black font-black" />
+      </button>
     </div>
   );
 }
@@ -2697,7 +3156,7 @@ function AppContainer() {
                 </div>
               </div>
             </header>
-          ) : (
+          ) : state.currentView === 'library' ? null : (
             <header className="sticky top-0 bg-[#121212]/95 backdrop-blur-md px-6 py-4 flex items-center justify-between z-10 border-b border-neutral-900 flex-shrink-0">
               <div className="flex items-center flex-grow">
                 <div className="flex space-x-2">
