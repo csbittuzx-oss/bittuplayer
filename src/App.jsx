@@ -482,7 +482,9 @@ export function AppProvider({ children }) {
         }
         audioRef.current.activeObjectUrl = sourceUrl;
       } else {
-        sourceUrl = getAudioUrlByQuality(song, state.audioQuality || 'high');
+        if (song.isFresh && song.downloadUrl && song.downloadUrl.length > 0) {
+          sourceUrl = getAudioUrlByQuality(song, state.audioQuality || 'high');
+        }
       }
 
       if (sourceUrl) {
@@ -625,7 +627,7 @@ function HomePage() {
 
       setData({
         charts: chartsRes?.results || [],
-        trending: trendingRes?.results || [],
+        trending: (trendingRes?.results || []).map(s => ({ ...s, isFresh: true })),
         artists: mergedArtists,
         newReleases: releaseRes?.results || []
       });
@@ -1221,6 +1223,9 @@ function PlaylistPage() {
     try {
       setLoading(true);
       const res = await apiFetch(`/playlists?id=${playlist.id}`);
+      if (res && res.songs) {
+        res.songs = res.songs.map(s => ({ ...s, isFresh: true }));
+      }
       setHydratedPlaylist(res);
     } catch (e) {
       console.error(e);
@@ -1324,6 +1329,9 @@ function AlbumPage() {
     try {
       setLoading(true);
       const res = await apiFetch(`/albums?id=${album.id}`);
+      if (res && res.songs) {
+        res.songs = res.songs.map(s => ({ ...s, isFresh: true }));
+      }
       setHydratedAlbum(res);
     } catch (e) {
       console.error(e);
@@ -1414,7 +1422,7 @@ function ArtistPage() {
 
       setData({
         artistInfo,
-        songs: artistSongs?.results || [],
+        songs: (artistSongs?.results || []).map(s => ({ ...s, isFresh: true })),
         albums: artistAlbums?.results || []
       });
     } catch (e) {
@@ -2175,11 +2183,11 @@ function AppContainer() {
         activeObjectUrlRef.current = sourceUrl;
         audioRef.current.activeObjectUrl = sourceUrl;
       } else {
-        if (!song.downloadUrl || song.downloadUrl.length === 0) {
+        if (!song.isFresh || !song.downloadUrl || song.downloadUrl.length === 0) {
           try {
             const detailRes = await apiFetch(`/songs?id=${song.id}`);
             if (detailRes && detailRes.length > 0) {
-              fullSong = detailRes[0];
+              fullSong = { ...detailRes[0], isFresh: true };
               dispatch({ type: 'SET_CURRENT_SONG', payload: fullSong });
               const updatedQueue = state.queue.map(s => s.id === song.id ? fullSong : s);
               dispatch({ type: 'SET_QUEUE', payload: { songs: updatedQueue, index: state.queueIndex } });
