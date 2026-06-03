@@ -44,7 +44,11 @@ import {
   CloudLightning,
   AlertCircle,
   Sliders,
-  Filter
+  Filter,
+  ChevronDown,
+  MoreVertical,
+  PlusCircle,
+  CheckCircle
 } from 'lucide-react';
 
 // ==========================================
@@ -3508,97 +3512,192 @@ function AppContainer() {
       )}
 
       {/* Full-Screen Blur Canvas Player Overlay */}
-      {fullscreenOpen && state.currentSong && (
-        <div
-          className="fixed inset-0 bg-cover bg-center z-50 flex flex-col justify-between p-6 md:p-12 text-white animate-slide-up"
-          style={{ backgroundImage: `linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.92)), url(${getImageUrl(state.currentSong, 2)})` }}
-        >
-          {/* Header Close toolbar */}
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setFullscreenOpen(false)}
-              className="text-neutral-400 hover:text-white cursor-pointer"
-              aria-label="Minimize full screen player"
+      {fullscreenOpen && state.currentSong && (() => {
+        const alreadyLiked = state.likedSongs.some(s => s.id === state.currentSong.id);
+        const handlePlusClick = () => {
+          if (!alreadyLiked) {
+            dispatch({ type: 'TOGGLE_LIKE', payload: state.currentSong });
+            showToast("Added to Liked Songs ✓");
+          } else {
+            showToast("Already in Liked Songs");
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 flex flex-col justify-between p-6 text-white overflow-hidden select-none animate-slide-up">
+            {/* Full screen background: blurred album art */}
+            <div 
+              className="absolute inset-0 bg-cover bg-center pointer-events-none transition-all duration-500"
+              style={{
+                backgroundImage: `url(${getImageUrl(state.currentSong, 2)})`,
+                filter: 'blur(80px) brightness(0.35) saturate(1.4)',
+                transform: 'scale(1.2)',
+                zIndex: 0
+              }}
+            />
+            {/* Dark overlay */}
+            <div className="absolute inset-0 bg-black/40 z-0 pointer-events-none" />
+
+            {/* 1. TOP BAR */}
+            <div 
+              className="relative z-10 flex items-center justify-between px-4 py-3 rounded-xl shadow-lg mt-2 flex-shrink-0"
+              style={{ backgroundColor: '#2a2829' }}
             >
-              <Minimize2 className="w-6 h-6" />
-            </button>
-            <span className="text-xs uppercase tracking-wider font-bold text-neutral-400">Now Playing</span>
-            <div className="w-6 h-6" /> {/* spacer */}
-          </div>
-
-          {/* Central large cover frame and lyrics */}
-          <div className="flex flex-col md:flex-row items-center justify-center flex-grow my-8 md:my-16 space-y-8 md:space-y-0 md:space-x-16 max-w-5xl mx-auto w-full">
-            {/* Left Cover Frame */}
-            <div className="w-64 h-64 md:w-96 md:h-96 rounded-lg overflow-hidden shadow-2xl relative bg-neutral-800 flex-shrink-0">
-              <img src={getImageUrl(state.currentSong, 2)} alt="" className="w-full h-full object-cover" />
-            </div>
-
-            {/* Right details lyrics placeholder */}
-            <div className="flex-grow text-center md:text-left space-y-6 max-w-lg w-full">
-              <div className="space-y-2">
-                <h1 className="text-3xl md:text-4xl font-black text-white line-clamp-1">{decodeHtml(state.currentSong.name || state.currentSong.title)}</h1>
-                <p className="text-lg text-neutral-300 font-semibold">{decodeHtml(getArtistName(state.currentSong))}</p>
-              </div>
-
-              {/* Scrolling lyrics placeholder display */}
-              <div className="h-44 overflow-y-auto border-t border-b border-neutral-800/80 py-4 text-sm scrollbar-none space-y-3">
-                <p className="text-neutral-500 font-medium">Lyrics not synced.</p>
-                <p className="text-neutral-400 font-semibold text-lg hover:text-white transition">No lyrics available offline for this track.</p>
-                <p className="text-neutral-500">Lyrics powered by JioSaavn community.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom control seekers */}
-          <div className="w-full max-w-3xl mx-auto space-y-6 pb-6">
-            {/* Seeker Slider */}
-            <div className="space-y-2">
-              <div
-                className="relative h-1.5 rounded-full bg-neutral-800 cursor-pointer overflow-hidden"
-                onClick={handleProgressBarClick}
+              <button
+                onClick={() => setFullscreenOpen(false)}
+                className="text-white cursor-pointer hover:scale-105 active:scale-95 transition"
+                aria-label="Minimize full screen player"
               >
-                <div
-                  className="absolute left-0 top-0 bottom-0 bg-[#1db954]"
-                  style={{ width: `${currentPercentage}%` }}
+                <ChevronDown size={28} color="#fff" />
+              </button>
+              
+              <div className="text-center overflow-hidden flex-grow px-4">
+                <p className="text-[11px] text-[#b3b3b3] uppercase tracking-[1.5px] font-semibold truncate">
+                  PLAYING FROM YOUR LIBRARY
+                </p>
+                <p className="text-[14px] font-bold text-white truncate mt-0.5">
+                  {state.currentViewData?.name || state.currentViewData?.title || "Your Library"}
+                </p>
+              </div>
+
+              <button className="text-white cursor-pointer hover:scale-105 active:scale-95 transition">
+                <MoreVertical size={24} color="#fff" />
+              </button>
+            </div>
+
+            {/* 2. ALBUM ART */}
+            <div className="relative z-10 flex-grow flex items-center justify-center px-6 my-4">
+              <div 
+                className="w-full max-w-[340px] aspect-square overflow-hidden relative flex-shrink-0"
+                style={{
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+                  borderRadius: '12px'
+                }}
+              >
+                <img 
+                  src={getImageUrl(state.currentSong, 2)} 
+                  alt="" 
+                  className="w-full h-full object-cover" 
                 />
               </div>
-              <div className="flex items-center justify-between text-xs text-neutral-400">
+            </div>
+
+            {/* 3. SONG INFO ROW */}
+            <div className="relative z-10 flex items-center justify-between px-6 flex-shrink-0">
+              <div className="overflow-hidden flex-grow pr-4">
+                <h2 
+                  className="font-extrabold text-white truncate"
+                  style={{ fontSize: '22px', fontWeight: '800' }}
+                >
+                  {decodeHtml(state.currentSong.name || state.currentSong.title)}
+                </h2>
+                <p 
+                  className="truncate mt-1"
+                  style={{ fontSize: '14px', color: '#b3b3b3', fontWeight: '500' }}
+                >
+                  {decodeHtml(getArtistName(state.currentSong))}
+                </p>
+              </div>
+              <button 
+                onClick={handlePlusClick} 
+                className="cursor-pointer hover:scale-105 active:scale-95 transition flex-shrink-0"
+                aria-label="Add to Liked"
+              >
+                {alreadyLiked ? (
+                  <CheckCircle size={32} color="#1DB954" className="text-[#1DB954]" />
+                ) : (
+                  <PlusCircle size={32} color="#fff" />
+                )}
+              </button>
+            </div>
+
+            {/* 4. PROGRESS BAR */}
+            <div className="relative z-10 px-6 w-full space-y-2 flex-shrink-0 mt-4">
+              <input
+                type="range"
+                min="0"
+                max={duration || 1}
+                value={currentTime}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  audioRef.current.currentTime = val;
+                  setCurrentTime(val);
+                }}
+                className="w-full h-1 bg-[#4a4a4a] rounded-lg appearance-none cursor-pointer accent-white [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-0 [&::-webkit-slider-thumb]:h-0 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white hover:[&::-webkit-slider-thumb]:w-2.5 hover:[&::-webkit-slider-thumb]:h-2.5 active:[&::-webkit-slider-thumb]:w-2.5 active:[&::-webkit-slider-thumb]:h-2.5 [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:w-0 [&::-moz-range-thumb]:h-0 hover:[&::-moz-range-thumb]:w-2.5 hover:[&::-moz-range-thumb]:h-2.5 active:[&::-moz-range-thumb]:w-2.5 active:[&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:rounded-full transition-all duration-150"
+                style={{
+                  background: `linear-gradient(to right, #fff 0%, #fff ${currentPercentage}%, #4a4a4a ${currentPercentage}%, #4a4a4a 100%)`
+                }}
+              />
+              <div className="flex items-center justify-between text-xs" style={{ fontSize: '12px', color: '#b3b3b3' }}>
                 <span>{formatTime(currentTime)}</span>
                 <span>{formatTime(duration)}</span>
               </div>
             </div>
 
-            {/* Media controls button list */}
-            <div className="flex items-center justify-between px-6">
-              <button
-                onClick={() => dispatch({ type: 'TOGGLE_SHUFFLE' })}
-                className={`transition ${state.shuffle ? 'text-[#1db954]' : 'text-neutral-400 hover:text-white'}`}
-              >
-                <Shuffle className="w-6 h-6" />
+            {/* 5. CONTROLS ROW */}
+            <div className="relative z-10 flex items-center justify-between px-6 pb-8 pt-4 flex-shrink-0">
+              {/* Shuffle */}
+              <div className="flex flex-col items-center justify-center w-12">
+                <button
+                  onClick={() => dispatch({ type: 'TOGGLE_SHUFFLE' })}
+                  className="cursor-pointer transition-colors"
+                  style={{ color: state.shuffle ? '#1DB954' : '#b3b3b3' }}
+                >
+                  <Shuffle size={26} />
+                </button>
+                <div 
+                  className="w-1 h-1 rounded-full mt-1 transition-opacity duration-200"
+                  style={{ 
+                    backgroundColor: '#1DB954', 
+                    opacity: state.shuffle ? 1 : 0 
+                  }} 
+                />
+              </div>
+
+              {/* Skip Back */}
+              <button onClick={prevSong} className="cursor-pointer text-white hover:scale-105 active:scale-95 transition flex items-center justify-center">
+                <SkipBack size={36} fill="#fff" color="#fff" />
               </button>
-              <button onClick={prevSong} className="text-white hover:scale-105 transition">
-                <SkipBack className="w-8 h-8 fill-current" />
-              </button>
+
+              {/* Play/Pause */}
               <button
                 onClick={() => dispatch({ type: 'SET_PLAYING', payload: !state.isPlaying })}
-                className="w-16 h-16 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition shadow-2xl"
+                className="w-[72px] h-[72px] bg-white text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition shadow-2xl cursor-pointer flex-shrink-0"
                 aria-label={state.isPlaying ? "Pause" : "Play"}
               >
-                {state.isPlaying ? <Pause className="w-8 h-8 fill-black text-black" /> : <Play className="w-8 h-8 fill-black text-black ml-1" />}
+                {state.isPlaying ? (
+                  <Pause size={28} color="#000" className="fill-current text-black" />
+                ) : (
+                  <Play size={28} color="#000" className="fill-current text-black translate-x-[2px]" />
+                )}
               </button>
-              <button onClick={nextSong} className="text-white hover:scale-105 transition">
-                <SkipForward className="w-8 h-8 fill-current" />
+
+              {/* Skip Forward */}
+              <button onClick={nextSong} className="cursor-pointer text-white hover:scale-105 active:scale-95 transition flex items-center justify-center">
+                <SkipForward size={36} fill="#fff" color="#fff" />
               </button>
-              <button
-                onClick={toggleRepeat}
-                className={`transition ${state.repeat !== 'off' ? 'text-[#1db954]' : 'text-neutral-400 hover:text-white'}`}
-              >
-                <Repeat className="w-6 h-6" />
-              </button>
+
+              {/* Repeat */}
+              <div className="flex flex-col items-center justify-center w-12">
+                <button
+                  onClick={toggleRepeat}
+                  className="cursor-pointer transition-colors"
+                  style={{ color: state.repeat !== 'off' ? '#1DB954' : '#b3b3b3' }}
+                >
+                  <Repeat size={26} />
+                </button>
+                <div 
+                  className="w-1.5 h-1.5 rounded-full mt-1.5 transition-opacity duration-200"
+                  style={{ 
+                    backgroundColor: '#1DB954', 
+                    opacity: state.repeat !== 'off' ? 1 : 0 
+                  }} 
+                />
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Context Menu Overlay */}
       {contextMenu.visible && (
